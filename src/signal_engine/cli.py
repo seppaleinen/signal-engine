@@ -6,37 +6,36 @@ from signal_engine.sources.youtube import fetch_all_youtube
 from signal_engine.sources.reddit import fetch_all_reddit
 from signal_engine.filters import apply_filters
 
+def fetch_all():
+    """Fetch from every source. Returns {source_name: [items]}."""
+    all_items = {}
+    print("Fetching GitHub releases...")
+    for src, items in fetch_github(per_page=20).items():
+        all_items[src] = items
+    print("Fetching YouTube channels...")
+    for src, items in fetch_all_youtube(per_page=15).items():
+        all_items[src] = items
+    print("Fetching Reddit subreddits...")
+    for src, items in fetch_all_reddit(per_page=15).items():
+        all_items[src] = items
+    return all_items
+
 def run_all_sources(db_path: Path):
     store = Store(db_path)
+    all_items = fetch_all()
+    
     grand_inserted = 0
-    
-    print("=== GitHub releases ===")
-    inserted, _ = run_source_group(store, fetch_github, "github")
-    grand_inserted += inserted
-    
-    print("\n=== YouTube channels ===")
-    inserted, _ = run_source_group(store, fetch_all_youtube, "youtube")
-    grand_inserted += inserted
-    
-    print("\n=== Reddit subreddits ===")
-    inserted, _ = run_source_group(store, fetch_all_reddit, "reddit")
-    grand_inserted += inserted
-    
-    total = store.count_items()
-    print(f"\nGrand total: {grand_inserted} inserted, {total} items in store")
-    return grand_inserted, total
-
-def run_source_group(store, fetcher, label):
-    all_items = fetcher()
-    inserted = 0
     for source_name, items in all_items.items():
         if not items:
             continue
         n = store.upsert_items(source_name, items)
         total = store.count_items(source_name)
-        inserted += n
+        grand_inserted += n
         print(f"  {source_name}: {len(items)} fetched, {n} inserted, {total} total")
-    return inserted, 0
+    
+    total = store.count_items()
+    print(f"\nGrand total: {grand_inserted} inserted, {total} items in store")
+    return grand_inserted, total, all_items
 
 def run_stage3(db_path: Path):
     """
@@ -94,6 +93,7 @@ def main():
     parser.add_argument("--db", default="data/signal.db", help="Path to SQLite DB")
     parser.add_argument("--stage3", action="store_true", help="Run Stage 3 (filters) and exit")
     parser.add_argument("--stage4", action="store_true", help="Run Stage 4 (decision pass) on a sample and exit")
+    parser.add_argument("--run", action="store_true", help="Full pipeline: fetch, filters, decision, digest")
     args = parser.parse_args()
     
     db_path = Path(args.db)
@@ -108,7 +108,7 @@ def main():
         import asyncio
         from signal_engine.store import Store
         store = Store(db_path)
-        
+
         # Grab sample items from store (recent ones)
         sample = []
         for src in ["opencode-releases", "litellm-releases", "betterstack"]:
@@ -122,7 +122,7 @@ def main():
                     "body": "",
                     "published_at": published
                 })
-        
+
         print(f"Testing decision pass on {len(sample)} items...")
         from signal_engine.decision import USE_REAL_LLM
         if USE_REAL_LLM:
@@ -130,10 +130,10 @@ def main():
         else:
             print("Note: Using mock decision logic (no LLM endpoint configured). Configure LITELLM_BASE_URL in .env to use real model.")
         print()
-        
+
         from signal_engine.decision import decide_batch
         results = asyncio.run(decide_batch(sample))
-        
+
         kept = 0
         dropped = 0
         unsure = 0
@@ -145,11 +145,76 @@ def main():
                 dropped += 1
             else:
                 unsure += 1
-        
+
         print(f"\nSummary: kept {kept}, dropped {dropped}, unsure {unsure}")
-        print("\nNext: Configure LITELLM_BASE_URL in .env to run real LLM decision pass.")
         return 0
-    
+
+    if args.run:
+        # Full pipeline: fetch → filters → decision → digest
+        import asyncio
+        from signal_engine.store import Store
+        from signal_engine.decision import decide_batch
+        from signal_engine.reading import generate_digest, write_digest
+        from datetime import datetime
+
+        store = Store(db_path)
+
+        print("=== Stage 1-2: Fetching from all sources ===")
+        inserted, total, all_items = run_all_sources(db_path)
+        print(f"\nTotal in store: {total}")
+
+        print("\n=== Stage 3: Code filters ===")
+        filtered_items = []
+        filter_counts = {'age':0, 'engagement':0, 'language':0, 'length':0, 'kept':0}
+        for source_name, items in all_items.items():
+            kept, drops = apply_filters(items)
+            for item in kept:
+                item['source'] = source_name  # ensure source is set
+            filtered_items.extend(kept)
+            for k in filter_counts:
+                filter_counts[k] += drops.get(k, 0)
+
+        print(f"After filters: {len(filtered_items)} items (from {sum(len(v) for v in all_items.values())} fetched)")
+        print(f"  Dropped by age: {filter_counts['age']}, engagement: {filter_counts['engagement']}, language: {filter_counts['language']}, length: {filter_counts['length']}")
+
+        print("\n=== Stage 4: Decision pass ===")
+        decision_results = asyncio.run(decide_batch(filtered_items))
+
+        kept_items = []
+        drop_count = 0
+        unsure_count = 0
+        keep_count = 0
+        for item, scores, route in decision_results:
+            item['decision'] = scores
+            item['decision']['route'] = route
+            if route == "keep":
+                kept_items.append(item)
+                keep_count += 1
+            elif route == "unsure":
+                kept_items.append(item)
+                unsure_count += 1
+            else:
+                drop_count += 1
+
+        # Sort: keeps first, then unsure by relevance
+        kept_items.sort(key=lambda x: (x['decision'].get('route') == 'keep', x['decision'].get('relevance', 0)), reverse=True)
+
+        print(f"Decision results: kept {keep_count}, unsure {unsure_count}, dropped {drop_count}")
+        print(f"Items for digest: {len(kept_items)}")
+
+        print("\n=== Stage 5: Reading pass + digest ===")
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        digest_text = asyncio.run(generate_digest(kept_items, date_str))
+        digest_path = write_digest(digest_text, date_str)
+
+        print(f"Digest written to: {digest_path}")
+        print(f"\n{'='*60}")
+        print(digest_text[:1500])
+        if len(digest_text) > 1500:
+            print("... (truncated)")
+        print(f"{'='*60}")
+        return 0
+
     inserted, total = run_all_sources(db_path)
     
     # Prove deduplication by running again
