@@ -18,11 +18,11 @@ Data platform: picked per source (R2.6)
 
 | Source | What it is | How it is pulled | Why it is here |
 |---|---|---|---|
-| YouTube channels | AI-coding workflows, quantization, new tools | to be implemented (Stage 2) | R1.2: found gsq-rco + qwen3.8 here first |
-| Reddit (r/LocalLLM, r/MachineLearning, etc.) | Community findings, fixes, workflows | to be implemented (Stage 2) | R2.2: where users of my tools talk |
-| OpenCode changelog/releases | Coding agent updates | to be implemented (Stage 2) | R2.1: daily tool |
-| LM Studio / llama-swap / llama.cpp releases | Local model serving | to be implemented (Stage 2) | R2.1: daily tools |
-| Hindsight, LiteLLM, similar tools | New tools in the AI-coding stack | to be implemented (Stage 2) | R2.3 keep example: new tools |
+| YouTube channels | AI-coding workflows, quantization, new tools | YouTube RSS (free) | R1.2: found gsq-rco + qwen3.8 here first |
+| Reddit (r/LocalLLM, r/MachineLearning, etc.) | Community findings, fixes, workflows | Reddit RSS (free, 429-retry) | R2.2: where users of my tools talk |
+| OpenCode changelog/releases | Coding agent updates | GitHub Releases API (anomalyco/opencode) | R2.1: daily tool |
+| LM Studio / llama-swap / llama.cpp releases | Local model serving | GitHub Releases API (ggml-org/llama.cpp, lmstudio-ai/lms) | R2.1: daily tools |
+| Hindsight, LiteLLM, similar tools | New tools in the AI-coding stack | GitHub Releases API (vectorize-io/hindsight, BerriAI/litellm) | R2.3 keep example: new tools |
 | Quantization repos (e.g. gsq-rco) | Model compression that fits my 16GB | to be implemented (Stage 2) | R1.2 example: qwen3.8 + gsq-rco |
 
 ## Code filters
