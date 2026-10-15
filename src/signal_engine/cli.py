@@ -93,6 +93,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--db", default="data/signal.db", help="Path to SQLite DB")
     parser.add_argument("--stage3", action="store_true", help="Run Stage 3 (filters) and exit")
+    parser.add_argument("--stage4", action="store_true", help="Run Stage 4 (decision pass) on a sample and exit")
     args = parser.parse_args()
     
     db_path = Path(args.db)
@@ -100,6 +101,53 @@ def main():
     
     if args.stage3:
         run_stage3(db_path)
+        return 0
+    
+    if args.stage4:
+        # Run decision pass on a sample
+        import asyncio
+        from signal_engine.store import Store
+        store = Store(db_path)
+        
+        # Grab sample items from store (recent ones)
+        sample = []
+        for src in ["opencode-releases", "litellm-releases", "betterstack"]:
+            rows = store.get_items(src, limit=5)
+            for id_, title, url, published in rows:
+                sample.append({
+                    "id": id_,
+                    "source": src,
+                    "title": title,
+                    "url": url,
+                    "body": "",
+                    "published_at": published
+                })
+        
+        print(f"Testing decision pass on {len(sample)} items...")
+        from signal_engine.decision import USE_REAL_LLM
+        if USE_REAL_LLM:
+            print("Using real LiteLLM decision model (freellmapi)")
+        else:
+            print("Note: Using mock decision logic (no LLM endpoint configured). Configure LITELLM_BASE_URL in .env to use real model.")
+        print()
+        
+        from signal_engine.decision import decide_batch
+        results = asyncio.run(decide_batch(sample))
+        
+        kept = 0
+        dropped = 0
+        unsure = 0
+        for item, scores, route in results:
+            print(f"[{route.upper():6}] rel={scores['relevance']:.2f} new={scores['new']:.2f} | {item['title'][:80]}")
+            if route == "keep":
+                kept += 1
+            elif route == "drop":
+                dropped += 1
+            else:
+                unsure += 1
+        
+        print(f"\nSummary: kept {kept}, dropped {dropped}, unsure {unsure}")
+        print("\nNext: Configure LITELLM_BASE_URL in .env to run real LLM decision pass.")
         return 0
     
     inserted, total = run_all_sources(db_path)
