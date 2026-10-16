@@ -100,17 +100,36 @@ async def generate_digest(items: List[Dict], date_str: str | None = None) -> str
             {"role": "user", "content": prompt}
         ]
     }
-    
+
     headers = {}
     if LITELLM_KEY:
         headers["Authorization"] = f"Bearer {LITELLM_KEY}"
-    
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        resp = await client.post(f"{LITELLM_BASE}/chat/completions", json=payload, headers=headers)
-        resp.raise_for_status()
-        data = resp.json()
-        content = data["choices"][0]["message"]["content"]
-        return content.strip()
+
+    # The reading pass is one big call; free LLM endpoints can be slow.
+    # Retry with backoff; if it still fails, fall back to a plain list so the
+    # run never loses its digest.
+    timeout = httpx.Timeout(180.0, connect=15.0)
+    last_err = None
+    for attempt in range(3):
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                resp = await client.post(f"{LITELLM_BASE}/chat/completions", json=payload, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
+                content = data["choices"][0]["message"]["content"]
+                if content and content.strip():
+                    return content.strip()
+                last_err = ValueError("empty response from model")
+        except Exception as e:
+            last_err = e
+        await asyncio.sleep(5 * (attempt + 1))
+
+    # Fallback: write a simple list digest so the run never fails completely
+    items_md = "\n".join([
+        f"- **{item.get('title', 'Untitled')}** - Source: {item.get('source', 'unknown')}. [link]({item.get('url', '#')})"
+        for item in items[:DIGEST_CAP]
+    ])
+    return f"# {date_str} - Digest (fallback)\n\n## Items\n{items_md}"
 
 def write_digest(digest: str, date_str: str | None = None, digest_dir: str = "digests") -> Path:
     """Write digest to file. Returns the path."""
