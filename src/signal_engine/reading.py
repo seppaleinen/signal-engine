@@ -32,12 +32,12 @@ DIGEST_FORMAT = """# {date} - {headline}
 {also}
 """
 
-DIGEST_PROMPT = f"""You write a daily digest for one person. They keep up with {FOCUS}, and they read this to decide what to try or adopt this week.
+DIGEST_PROMPT = """You write a daily digest for one person. They keep up with {focus}, and they read this to decide what to try or adopt this week.
 
 Below are today's items that passed their filter. Some are marked unsure: include one only if it clearly reports something new and concrete that matters to them.
 
 Rules:
-- At most {DIGEST_CAP} items. Pick the ones that change what they would do this week.
+- At most {cap} items. Pick the ones that change what they would do this week.
 - Group items about the same thing into one entry.
 - One or two plain sentences per entry: what changed, and why it matters to them.
 - Keep every link. Never invent a link or a detail that is not in the item.
@@ -46,7 +46,7 @@ Rules:
 - No hype words, no exclamation marks.
 
 Format:
-# <Date> - <one line on what mattered today>
+# {date} - <one line on what mattered today>
 
 ## <Group>
 - **<Item in plain words>** - one or two sentences on what changed and why it matters. [source](url)
@@ -55,7 +55,7 @@ Format:
 - one-liners with links
 
 Items (JSON array with title, source, url, body, relevance, new, route):
-{{items_json}}
+{items_json}
 
 Respond with markdown only. No extra text before or after.
 """
@@ -81,7 +81,12 @@ async def generate_digest(items: List[Dict], date_str: str | None = None) -> str
             "route": item.get("decision", {}).get("route", "unsure")
         })
     
-    prompt = DIGEST_PROMPT.format(items_json=json.dumps(items_for_prompt, indent=2))
+    prompt = DIGEST_PROMPT.format(
+        items_json=json.dumps(items_for_prompt, indent=2),
+        date=date_str or datetime.now().strftime("%Y-%m-%d"),
+        focus=FOCUS,
+        cap=DIGEST_CAP
+    )
     
     if not USE_REAL_LLM:
         # Mock digest for testing
