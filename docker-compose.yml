@@ -12,6 +12,17 @@ services:
       - LITELLM_API_KEY=${LITELLM_API_KEY:-}
     command: --run
 
+  # Long-running sidecar: serves digests over HTTP at http://localhost:8080/
+  signal-engine-viewer:
+    image: signal-engine:latest
+    build: .
+    volumes:
+      - ./digests:/app/digests:ro
+    ports:
+      - "8080:8000"
+    restart: unless-stopped
+    command: --viewer
+
   # Optional: run on a schedule using a cron container
   # signal-engine-cron:
   #   image: signal-engine:latest

@@ -94,8 +94,15 @@ def main():
     parser.add_argument("--stage3", action="store_true", help="Run Stage 3 (filters) and exit")
     parser.add_argument("--stage4", action="store_true", help="Run Stage 4 (decision pass) on a sample and exit")
     parser.add_argument("--run", action="store_true", help="Full pipeline: fetch, filters, decision, digest")
+    parser.add_argument("--viewer", action="store_true", help="Start the digest web viewer (no DB needed)")
+    parser.add_argument("--port", type=int, default=8000, help="Viewer port (default 8000)")
+    parser.add_argument("--digests-dir", default="digests", help="Digest directory (default digests)")
     args = parser.parse_args()
-    
+
+    if args.viewer:
+        from signal_engine.viewer import run_viewer
+        return run_viewer(digest_dir=args.digests_dir, port=args.port)
+
     db_path = Path(args.db)
     db_path.parent.mkdir(parents=True, exist_ok=True)
     

@@ -38,5 +38,11 @@ digests/
 *.swp
 *.swo
 
+# Backups / temp files
+*.bak
+*.orig
+*.tmp
+*~
+
 # OS
 .DS_Store

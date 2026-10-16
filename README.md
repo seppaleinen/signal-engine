@@ -74,3 +74,23 @@ sources -> store (SQLite, dedupe, stable ids) -> code filters
 
 Planned: daily run at 07:30 local time. For Kubernetes (k3s) deployment, see
 [issue #1](https://github.com/seppaleinen/signal-engine/issues/1).
+
+## Web viewer
+
+A long-running sidecar serves the digests over HTTP. With Docker Compose:
+
+```bash
+docker compose up
+```
+
+- `signal-engine` runs once (`--run`), writes `digests/YYYY-MM-DD.md` + `.html`, then exits.
+- `signal-engine-viewer` stays up and serves at `http://localhost:8080/`.
+
+HTML is generated alongside markdown for every new digest. Legacy md-only digests
+(e.g. `2026-10-15.md`) are rendered on the fly when requested.
+
+Local (non-Docker) usage:
+
+```bash
+uv run signal-engine --viewer --port 8000
+```

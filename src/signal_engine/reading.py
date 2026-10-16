@@ -137,11 +137,19 @@ async def generate_digest(items: List[Dict], date_str: str | None = None) -> str
     return f"# {date_str} - Digest (fallback)\n\n## Items\n{items_md}"
 
 def write_digest(digest: str, date_str: str | None = None, digest_dir: str = "digests") -> Path:
-    """Write digest to file. Returns the path."""
+    """Write digest markdown to file, plus an HTML rendering alongside.
+
+    The markdown is the source of truth. Returns the .md path.
+    """
     if date_str is None:
         date_str = datetime.now().strftime("%Y-%m-%d")
-    
+
+    from signal_engine.digest_html import render_digest_html
+
     digest_path = Path(digest_dir) / f"{date_str}.md"
     digest_path.parent.mkdir(parents=True, exist_ok=True)
     digest_path.write_text(digest, encoding="utf-8")
+
+    html_path = digest_path.with_suffix(".html")
+    html_path.write_text(render_digest_html(digest), encoding="utf-8")
     return digest_path
