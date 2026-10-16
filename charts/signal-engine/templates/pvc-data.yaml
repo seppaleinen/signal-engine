@@ -1,0 +1,40 @@
+{{- if and .Values.persistence.enabled .Values.persistence.data -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "signal-engine.fullname" . | printf "%s-data" | quote }}
+  labels:
+    {{- include "signal-engine.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    {{- toYaml .Values.persistence.data.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.data.size | quote }}
+{{ if .Values.persistence.storageClassName }}
+  storageClassName: {{ .Values.persistence.storageClassName | quote }}
+{{ else if .Values.persistence.data.storageClassName }}
+  storageClassName: {{ .Values.persistence.data.storageClassName | quote }}
+{{ end }}
+{{- end }}
+{{- if and .Values.persistence.enabled .Values.persistence.digests -}}
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "signal-engine.fullname" . | printf "%s-digests" | quote }}
+  labels:
+    {{- include "signal-engine.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    {{- toYaml .Values.persistence.digests.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.digests.size | quote }}
+{{ if .Values.persistence.storageClassName }}
+  storageClassName: {{ .Values.persistence.storageClassName | quote }}
+{{ else if .Values.persistence.digests.storageClassName }}
+  storageClassName: {{ .Values.persistence.digests.storageClassName | quote }}
+{{ end }}
+{{- end }}

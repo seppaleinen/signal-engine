@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.configMap.name | default "signal-engine-config" | quote }}
+  labels:
+    {{- include "signal-engine.labels" . | nindent 4 }}
+data:
+  # Non-secret runtime configuration. Secrets live in secret.yaml.
+  DIGESTS_DIR: "/app/digests"
+  DATA_DIR: "/app/data"
+  VIEWER_PORT: {{ .Values.viewer.port | quote }}
+  CRON_SCHEDULE: {{ .Values.cronJob.schedule | quote }}

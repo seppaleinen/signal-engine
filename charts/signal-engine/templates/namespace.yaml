@@ -1,0 +1,8 @@
+{{- if .Values.namespace -}}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace | quote }}
+  labels:
+    app.kubernetes.io/name: {{ include "signal-engine.name" . | quote }}
+{{- end -}}

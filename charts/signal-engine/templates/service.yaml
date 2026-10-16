@@ -1,0 +1,19 @@
+{{- if .Values.viewer.replicas -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "signal-engine.fullname" . | printf "%s-viewer" | quote }}
+  labels:
+    {{- include "signal-engine.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.viewer.port | quote }}
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: {{ include "signal-engine.name" . | quote }}
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/component: viewer
+{{- end -}}

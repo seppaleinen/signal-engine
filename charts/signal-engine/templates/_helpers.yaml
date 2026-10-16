@@ -1,0 +1,52 @@
+{{/*
+Expand the chart name. Used for labels and selectors so that multiple
+instances of the chart can coexist in the same namespace.
+*/}}
+{{- define "signal-engine.name" -}}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+Common labels. Applied to every resource so they can be selected together.
+*/}}
+{{- define "signal-engine.labels" -}}
+helm.sh/chart: {{ include "signal-engine.chart" . }}
+{{ include "signal-engine.selectorLabels" . }}
+{{- if .Values.appVersion }}
+app.kubernetes.io/version: {{ .Values.appVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end -}}
+
+{{- define "signal-engine.chart" -}}
+{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+Selector labels. These must be stable across upgrades — never include the
+release name in a selector (Helm does that for us via release label).
+*/}}
+{{- define "signal-engine.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "signal-engine.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end -}}
+
+{{/*
+Standard pod labels (selector labels + anything extra).
+*/}}
+{{- define "signal-engine.podLabels" -}}
+{{- include "signal-engine.selectorLabels" . | nindent 0 }}
+{{- end -}}
+
+{{/*
+Full name, suffixed with the release name. Used for resources that must be
+unique per release (PVCs, etc.).
+*/}}
+{{- define "signal-engine.fullname" -}}
+{{- $name := default .Chart.Name .Values.nameOverride -}}
+{{- if .Values.fullnameOverride -}}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- $name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}

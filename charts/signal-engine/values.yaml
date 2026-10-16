@@ -1,0 +1,85 @@
+# Default values for signal-engine Helm chart.
+
+# Image used for both the CronJob (pipeline --run) and the Deployment (viewer --viewer).
+# Reuse the existing signal-engine:latest image. Override image.repository / image.tag
+# to point at a different registry/tag (e.g. your own build).
+image:
+  repository: seppaleinen/signal-engine
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Secret template values. These are PLACEHOLDERS — never commit real credentials.
+# Set real values at install time with --set or via external-secrets / kubectl.
+secret:
+  litellmBaseUrl: "https://litellm.example.com/v1"
+  litellmApiKey: "REPLACE-ME"
+
+# Namespace the chart is installed into. Left empty to use the current context
+# namespace (or the --namespace flag). Set explicitly to always create a namespace.
+namespace: "signal-engine"
+
+# --- Persistence ---
+persistence:
+  enabled: true
+  storageClassName: ""          # empty = use cluster default (dynamic provisioning)
+  data:
+    size: 1Gi
+    accessModes: ["ReadWriteOnce"]
+  digests:
+    size: 1Gi
+    accessModes: ["ReadWriteOnce"]
+
+# --- CronJob (daily 07:30 pipeline run) ---
+cronJob:
+  enabled: true
+  schedule: "30 7 * * *"     # daily 07:30 local time
+  timezone: ""               # optional: e.g. "Europe/Helsinki"; empty = cluster TZ
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  backoffLimit: 1
+  # Extra env vars (non-secret) appended to the job container.
+  extraEnv: []
+  # Resource limits for the job container.
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+# --- Viewer Deployment (long-running sidecar, serves digests) ---
+viewer:
+  replicas: 1
+  port: 8000
+  # Resource limits for the viewer container.
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  # Extra env vars (non-secret) appended to the viewer container.
+  extraEnv: []
+
+# --- Service ---
+service:
+  type: ClusterIP
+  port: 80
+
+# --- Ingress ---
+ingress:
+  enabled: true
+  className: ""                # empty = default ingress class
+  hosts:
+    - host: signal-engine.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []                      # e.g. - secretName: signal-engine-tls, hosts: [...]
+
+# --- ConfigMap ---
+configMap:
+  name: signal-engine-config

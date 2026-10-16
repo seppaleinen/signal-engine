@@ -72,8 +72,64 @@ sources -> store (SQLite, dedupe, stable ids) -> code filters
 
 ## Schedule
 
-Planned: daily run at 07:30 local time. For Kubernetes (k3s) deployment, see
-[issue #1](https://github.com/seppaleinen/signal-engine/issues/1).
+Planned: daily run at 07:30 local time.
+
+## Kubernetes (k3s) deployment
+
+A Helm chart lives in `charts/signal-engine/`. It follows the sidecar architecture
+established in [issue #2](https://github.com/seppaleinen/signal-engine/issues/2):
+
+- **CronJob** (`signal-engine-run`) runs `signal-engine --run` daily at 07:30 local
+  time. Writes to the `digests` PVC.
+- **Deployment** (`signal-engine-viewer`) runs `signal-engine --viewer` as a
+  long-running sidecar. Serves digests via the Service + Ingress and shares the
+  `digests` PVC so it immediately sees job output.
+- **PVCs** for `data/` (SQLite store) and `digests/`.
+
+### Install
+
+```bash
+# From the repo (local chart)
+helm install signal-engine ./charts/signal-engine \
+  --namespace signal-engine \
+  --set secret.litellmBaseUrl=https://your-llm/v1 \
+  --set secret.litellmApiKey=YOUR-KEY
+
+# Or from the published chart (GitHub Release)
+helm install signal-engine https://github.com/seppaleinen/signal-engine/releases/download/chart/v0.1.0/signal-engine-0.1.0.tgz \
+  --namespace signal-engine \
+  --set secret.litellmBaseUrl=https://your-llm/v1 \
+  --set secret.litellmApiKey=YOUR-KEY
+```
+
+The viewer is then reachable at the Ingress host (default `signal-engine.local` —
+override with `--set ingress.hosts[0].host=viewer.example.com`).
+
+### Credentials
+
+The Secret manifest ships with **placeholder values** only. Never commit real
+credentials. Set them at install time with `--set` (as above), pre-create the
+secret with `kubectl`, or use external-secrets:
+
+```bash
+kubectl create secret generic signal-engine-secret \
+  --from-literal=LITELLM_BASE_URL=https://your-llm/v1 \
+  --from-literal=LITELLM_API_KEY=YOUR-KEY \
+  --namespace signal-engine
+```
+
+### Options
+
+| Value | Default | Notes |
+|---|---|---|
+| `cronJob.enabled` | `true` | Disable the daily run |
+| `ingress.enabled` | `true` | Disable if no ingress controller |
+| `persistence.enabled` | `true` | Disable PVCs (stateless) |
+| `persistence.storageClassName` | cluster default | Pin a storage class |
+| `cronJob.schedule` | `30 7 * * *` | Cron expression |
+| `cronJob.timezone` | cluster TZ | e.g. `Europe/Helsinki` |
+| `image.repository` | `seppaleinen/signal-engine` | Override the image |
+| `image.tag` | `latest` | Override the tag |
 
 ## Web viewer
 

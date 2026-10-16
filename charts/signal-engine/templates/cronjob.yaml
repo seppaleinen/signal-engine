@@ -1,0 +1,68 @@
+{{- if .Values.cronJob.enabled -}}
+{{- $secretName := include "signal-engine.fullname" . | printf "%s-secret" -}}
+{{- $cmName := .Values.configMap.name | default "signal-engine-config" -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "signal-engine.fullname" . | printf "%s-run" | quote }}
+  labels:
+    {{- include "signal-engine.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.cronJob.schedule | quote }}
+  {{- if .Values.cronJob.timezone }}
+  timeZone: {{ .Values.cronJob.timezone | quote }}
+  {{- end }}
+  concurrencyPolicy: {{ .Values.cronJob.concurrencyPolicy }}
+  successfulJobsHistoryLimit: {{ .Values.cronJob.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.cronJob.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.cronJob.backoffLimit }}
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: {{ include "signal-engine.name" . | quote }}
+            app.kubernetes.io/instance: {{ .Release.Name | quote }}
+            app.kubernetes.io/component: cronjob
+        spec:
+          restartPolicy: OnFailure
+          {{- if .Values.persistence.enabled }}
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: {{ include "signal-engine.fullname" . | printf "%s-data" | quote }}
+            - name: digests
+              persistentVolumeClaim:
+                claimName: {{ include "signal-engine.fullname" . | printf "%s-digests" | quote }}
+          {{- end }}
+          containers:
+            - name: run
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command:
+                - signal-engine
+                - --run
+                - --db
+                - /app/data/signal.db
+                - --digests-dir
+                - /app/digests
+              envFrom:
+                - configMapRef:
+                    name: {{ $cmName | quote }}
+                - secretRef:
+                    name: {{ $secretName | quote }}
+              env:
+                {{- range .Values.cronJob.extraEnv }}
+                - name: {{ .name | quote }}
+                  value: {{ .value | quote }}
+                {{- end }}
+              volumeMounts:
+                {{- if .Values.persistence.enabled }}
+                - name: data
+                  mountPath: /app/data
+                - name: digests
+                  mountPath: /app/digests
+                {{- end }}
+              resources:
+                {{- toYaml .Values.cronJob.resources | nindent 16 }}
+{{- end -}}
