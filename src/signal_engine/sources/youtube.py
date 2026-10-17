@@ -1,6 +1,7 @@
 import xml.etree.ElementTree as ET
+from typing import Dict, List
+
 import httpx
-from typing import List, Dict
 
 # Verified channel IDs (R2.2). RSS is free — no API key needed.
 YOUTUBE_CHANNELS = {
@@ -28,7 +29,7 @@ def fetch_youtube_channel(channel_id: str, per_page: int = 50) -> List[Dict]:
     for entry in root.findall('atom:entry', NS):
         video_id = entry.find('atom:yt:videoId', NS)
         title = entry.find('atom:title', NS)
-        link = entry.find('atom:link', NS)
+        entry.find('atom:link', NS)
         published = entry.find('atom:published', NS)
         author = entry.find('atom:author', NS)
         media_group = entry.find('media:group', NS)

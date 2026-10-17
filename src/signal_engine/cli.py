@@ -1,10 +1,12 @@
 import sys
 from pathlib import Path
-from signal_engine.store import Store
-from signal_engine.sources.github_releases import fetch_all_sources as fetch_github
-from signal_engine.sources.youtube import fetch_all_youtube
-from signal_engine.sources.reddit import fetch_all_reddit
+
 from signal_engine.filters import apply_filters
+from signal_engine.sources.github_releases import fetch_all_sources as fetch_github
+from signal_engine.sources.reddit import fetch_all_reddit
+from signal_engine.sources.youtube import fetch_all_youtube
+from signal_engine.store import Store
+
 
 def fetch_all():
     """Fetch from every source. Returns {source_name: [items]}."""
@@ -78,7 +80,7 @@ def run_stage3(db_path: Path):
             grand_drops[k] += drops.get(k, 0)
         print(f"  {source_name}: {total_n} -> kept {kept_n}, dropped {drops}")
     
-    print(f"\n=== Summary ===")
+    print("\n=== Summary ===")
     print(f"Total items fetched: {grand_total}")
     print(f"Kept after filters: {grand_kept}")
     print(f"Dropped by age: {grand_drops['age']}")
@@ -113,6 +115,7 @@ def main():
     if args.stage4:
         # Run decision pass on a sample
         import asyncio
+
         from signal_engine.store import Store
         store = Store(db_path)
 
@@ -159,10 +162,11 @@ def main():
     if args.run:
         # Full pipeline: fetch → filters → decision → digest
         import asyncio
-        from signal_engine.store import Store
+        from datetime import datetime
+
         from signal_engine.decision import decide_batch
         from signal_engine.reading import generate_digest, write_digest
-        from datetime import datetime
+        from signal_engine.store import Store
 
         store = Store(db_path)
 

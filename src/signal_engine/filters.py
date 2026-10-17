@@ -1,6 +1,7 @@
-from datetime import datetime, timezone
 import re
-from typing import List, Tuple, Dict
+from datetime import datetime, timezone
+from typing import Dict, List, Tuple
+
 
 def parse_dt(dt_str: str | None) -> datetime | None:
     if not dt_str:
@@ -49,14 +50,12 @@ def apply_filters(items: List[Dict]) -> Tuple[List[Dict], Dict[str, int]]:
     
     kept = []
     for item in items:
-        reason = None
         
         # Age filter
         pub = parse_dt(item.get('published_at'))
         if pub:
             age = (now - pub).days
             if age > age_days:
-                reason = 'age'
                 dropped['age'] += 1
                 continue
         
@@ -71,20 +70,17 @@ def apply_filters(items: List[Dict]) -> Tuple[List[Dict], Dict[str, int]]:
             # Only apply if we have a meaningful count; otherwise skip
             # Floor of 10 is arbitrary; we can tune in shadow week
             if eng < 10:
-                reason = 'engagement'
                 dropped['engagement'] += 1
                 continue
         
         # Language
         text = f"{item.get('title','')} {item.get('body','')}"
         if not is_english(text):
-            reason = 'language'
             dropped['language'] += 1
             continue
         
         # Length / substance
         if len(text.strip()) < 20:
-            reason = 'length'
             dropped['length'] += 1
             continue
         

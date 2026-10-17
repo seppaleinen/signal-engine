@@ -1,8 +1,8 @@
-import sqlite3
 import json
+import sqlite3
+from datetime import datetime
 from pathlib import Path
 from typing import Iterable
-from datetime import datetime
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS items (

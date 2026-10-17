@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import List, Tuple
 
-from signal_engine.digest_html import render_digest_html, digest_html_for_file
+from signal_engine.digest_html import digest_html_for_file
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _MD_RE = re.compile(r"^\d{4}-\d{2}-\d{2}\.md$")

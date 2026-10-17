@@ -12,8 +12,9 @@ Routing:
 """
 
 import os
+from typing import Dict, List, Tuple
+
 import httpx
-from typing import List, Dict, Tuple
 from dotenv import load_dotenv
 
 load_dotenv()

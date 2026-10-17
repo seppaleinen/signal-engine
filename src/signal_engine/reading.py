@@ -5,13 +5,14 @@ Reads items that passed filters + decision pass, groups related items,
 and writes a digest in the format from PROFILE.md.
 """
 
-import os
-import json
 import asyncio
-import httpx
+import json
+import os
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict
+from typing import Dict, List
+
+import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -114,7 +115,6 @@ async def generate_digest(items: List[Dict], date_str: str | None = None) -> str
     # Retry with backoff; if it still fails, fall back to a plain list so the
     # run never loses its digest.
     timeout = httpx.Timeout(180.0, connect=15.0)
-    last_err = None
     for attempt in range(3):
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
@@ -124,9 +124,9 @@ async def generate_digest(items: List[Dict], date_str: str | None = None) -> str
                 content = data["choices"][0]["message"]["content"]
                 if content and content.strip():
                     return content.strip()
-                last_err = ValueError("empty response from model")
-        except Exception as e:
-            last_err = e
+            pass
+        except Exception:
+            pass
         await asyncio.sleep(5 * (attempt + 1))
 
     # Fallback: write a simple list digest so the run never fails completely

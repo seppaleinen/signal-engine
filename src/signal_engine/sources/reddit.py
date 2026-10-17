@@ -1,7 +1,8 @@
-import xml.etree.ElementTree as ET
-import httpx
 import time
-from typing import List, Dict
+import xml.etree.ElementTree as ET
+from typing import Dict, List
+
+import httpx
 
 # Free Reddit RSS — no API key, no paid scraper. Reddit rate-limits unauthenticated
 # requests (429), so we retry with backoff and cap posts per run.

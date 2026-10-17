@@ -1,5 +1,6 @@
+from typing import Dict, List
+
 import httpx
-from typing import List, Dict
 
 # Source registry: source_name -> (owner, repo)
 # Populated from PROFILE.md + GitHub API verification (all return 200).
