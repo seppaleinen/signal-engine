@@ -131,6 +131,27 @@ kubectl create secret generic signal-engine-secret \
 | `image.repository` | `seppaleinen/signal-engine` | Override the image |
 | `image.tag` | `latest` | Override the tag |
 
+## Releasing (automated)
+
+- **Auto release on main:** Push to `main` triggers a patch bump, builds the Docker image
+  `seppaleinen/signal-engine:<version>` (+ `:latest`), tags the chart, and creates a
+  GitHub Release `chart/v<version>` with asset `signal-engine-<version>.tgz`.
+
+- **Manual minor/major:** Push a tag `vX.Y.Z` to manually release a specific version.
+  The workflow validates the tag, converges the chart files, builds & pushes the image,
+  and releases the chart.
+
+- **Secrets required:** `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (Docker Hub).
+
+- **Consume:** Replace `<version>` below; chart archives are named
+  `signal-engine-<version>.tgz` and released under tag `chart/v<version>`:
+
+```bash
+helm install signal-engine \
+  https://github.com/seppaleinen/signal-engine/releases/download/chart/v0.1.0/signal-engine-0.1.0.tgz \
+  --namespace signal-engine
+```
+
 ## Web viewer
 
 A long-running sidecar serves the digests over HTTP. With Docker Compose:
