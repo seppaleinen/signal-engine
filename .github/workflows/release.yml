@@ -17,7 +17,7 @@
 # └─────────────────────────────────────────────────────────────────────────────┘
 #
 # Release tag format: chart/v<version> (e.g., chart/v0.1.2)
-# Image tags: seppaleinen/signal-engine:<version> + :latest
+# Image tags: ghcr.io/seppaleinen/signal-engine:<version> + :latest
 # [skip ci] in commit message prevents self-triggering the workflow
 
 name: Release
@@ -124,7 +124,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   # Job 2: build-and-push
   # - Builds Docker image from checked-out source
-  # - Pushes to Docker Hub with version + latest tags
+  # - Pushes to GHCR (ghcr.io/seppaleinen/signal-engine) with version + latest tags
   # - Note: image is built from source at pushed commit; version rewrites in
   #   the 'version' job affect that job's workspace only. The image tag is
   #   authoritative; pyproject.toml version in the image is for dependency
@@ -139,11 +139,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Login to Docker Hub
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
         id: build
@@ -154,8 +155,8 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            seppaleinen/signal-engine:${{ needs.version.outputs.version }}
-            seppaleinen/signal-engine:latest
+            ghcr.io/seppaleinen/signal-engine:${{ needs.version.outputs.version }}
+            ghcr.io/seppaleinen/signal-engine:latest
           labels: |
             org.opencontainers.image.version=${{ needs.version.outputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -254,7 +255,7 @@ jobs:
 
           # Generate release notes
           NOTES="## Changes
-          - Image: \`seppaleinen/signal-engine:${VERSION}\`
+          - Image: \`ghcr.io/seppaleinen/signal-engine:${VERSION}\`
           - Chart: \`signal-engine-${VERSION}.tgz\`
           - Previous version: ${PREVIOUS}
           - Commit: ${GITHUB_SHA}
