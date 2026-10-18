@@ -141,10 +141,11 @@ kubectl create secret generic signal-engine-secret \
   The workflow validates the tag, converges the chart files, builds & pushes the image,
   and releases the chart.
 
-- **Secrets required:** None beyond the default `GITHUB_TOKEN` (images are published to
+- **Secrets required:** `GHCR_TOKEN` — a classic personal access token with
+  `write:packages` and `read:packages` scopes (images are published to
   [GitHub Container Registry](https://docs.github.com/en/packages/working-with-packages/publishing-packages-with-github-container-registry)
-  `ghcr.io/seppaleinen/signal-engine`). The `GITHUB_TOKEN` secret has `write:packages`
-  permission by default in workflows.
+  `ghcr.io/seppaleinen/signal-engine`). The default `GITHUB_TOKEN` cannot push to
+  GHCR for a personal user account — a dedicated PAT is required.
 
 - **Consume:** Replace `<version>` below; chart archives are named
   `signal-engine-<version>.tgz` and released under tag `chart/v<version>`:
