@@ -1,7 +1,6 @@
+import subprocess
 import xml.etree.ElementTree as ET
 from typing import Dict, List
-
-import httpx
 
 from signal_engine.config import get_youtube_channels
 

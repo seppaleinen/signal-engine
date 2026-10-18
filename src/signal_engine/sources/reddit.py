@@ -1,8 +1,7 @@
+import subprocess
 import time
 import xml.etree.ElementTree as ET
 from typing import Dict, List
-
-import httpx
 
 from signal_engine.config import get_reddit_subreddits
 

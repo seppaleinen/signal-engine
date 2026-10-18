@@ -8,11 +8,11 @@ and writes a digest in the format from PROFILE.md.
 import asyncio
 import json
 import os
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 
-import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -135,13 +135,13 @@ async def generate_digest(items: List[Dict], date_str: str | None = None) -> str
                 ["-d", payload_json, f"{LITELLM_BASE}/chat/completions"],
                 capture_output=True,
                 text=True,
-                timeout=20
+                timeout=190
             )
             
             if result.returncode == 0:
                 try:
                     data = json.loads(result.stdout)
-                    content = data.get("choices", [{}])[0].get("content", "").strip()
+                    content = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
                     if content:
                         return content
                 except (json.JSONDecodeError, KeyError, IndexError) as e:
