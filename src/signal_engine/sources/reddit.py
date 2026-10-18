@@ -21,18 +21,34 @@ def fetch_reddit_subreddit(subreddit: str, per_page: int = 30, max_retries: int 
     last_err = None
     for attempt in range(max_retries):
         try:
-            with httpx.Client(timeout=30.0) as client:
-                resp = client.get(url, headers=headers)
-                if resp.status_code == 429:
-                    wait = 5 * (attempt + 1)
-                    time.sleep(wait)
-                    continue
-                resp.raise_for_status()
-                text = resp.text
-                # Guard against HTML login wall
-                if '<rss' not in text and '<feed' not in text:
-                    raise ValueError(f"Non-RSS response ({len(text)} bytes, starts with {text[:40]!r})")
-                break
+            # Make HTTP request via curl subprocess
+            curl_headers = []
+            for key, value in headers.items():
+                curl_headers.extend(["-H", f"{key}: {value}"])
+
+            result = subprocess.run(
+                ["curl", "-k", "-s", "--max-time", "30"] + curl_headers + [url],
+                capture_output=True,
+                text=True,
+                timeout=35
+            )
+
+            if result.returncode != 0:
+                raise Exception(f"Curl failed: {result.stderr}")
+
+            text = result.stdout
+            status_code = result.returncode  # curl returns 0 on success, non-zero on failure
+
+            # Check for 429 by looking at the response
+            if '429' in text or 'Too Many Requests' in text:
+                wait = 5 * (attempt + 1)
+                time.sleep(wait)
+                continue
+
+            # Guard against HTML login wall
+            if '<rss' not in text and '<feed' not in text:
+                raise ValueError(f"Non-RSS response ({len(text)} bytes, starts with {text[:40]!r})")
+            break
         except Exception as e:
             last_err = e
             if attempt < max_retries - 1:

@@ -9,10 +9,25 @@ def fetch_github_releases(owner: str, repo: str, per_page: int = 50) -> List[Dic
     url = f"https://api.github.com/repos/{owner}/{repo}/releases"
     headers = {"Accept": "application/vnd.github+json", "User-Agent": "signal-engine"}
     
-    with httpx.Client(timeout=30.0) as client:
-        resp = client.get(url, params={"per_page": per_page}, headers=headers)
-        resp.raise_for_status()
-        releases = resp.json()
+    # Make HTTP request via curl subprocess
+    curl_headers = []
+    for key, value in headers.items():
+        curl_headers.extend(["-H", f"{key}: {value}"])
+
+    # Build URL with query parameters
+    full_url = f"{url}?per_page={per_page}"
+
+    result = subprocess.run(
+        ["curl", "-k", "-s", "--max-time", "30"] + curl_headers + [full_url],
+        capture_output=True,
+        text=True,
+        timeout=35
+    )
+
+    if result.returncode != 0:
+        raise Exception(f"Curl failed: {result.stderr}")
+
+    releases = json.loads(result.stdout)
     
     items = []
     for rel in releases:

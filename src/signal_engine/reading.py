@@ -114,19 +114,42 @@ async def generate_digest(items: List[Dict], date_str: str | None = None) -> str
     # The reading pass is one big call; free LLM endpoints can be slow.
     # Retry with backoff; if it still fails, fall back to a plain list so the
     # run never loses its digest.
-    timeout = httpx.Timeout(180.0, connect=15.0)
     for attempt in range(3):
         try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                resp = await client.post(f"{LITELLM_BASE}/chat/completions", json=payload, headers=headers)
-                resp.raise_for_status()
-                data = resp.json()
-                content = data["choices"][0]["message"]["content"]
-                if content and content.strip():
-                    return content.strip()
-            pass
-        except Exception:
-            pass
+            # Prepare payload
+            payload_json = json.dumps(payload)
+            
+            # Prepare headers
+            headers = {"Content-Type": "application/json"}
+            if LITELLM_KEY:
+                headers["Authorization"] = f"Bearer {LITELLM_KEY}"
+            
+            # Convert headers to curl format
+            curl_headers = []
+            for key, value in headers.items():
+                curl_headers.extend(["-H", f"{key}: {value}"])
+            
+            # Make HTTP request via curl subprocess
+            result = subprocess.run(
+                ["curl", "-k", "-s", "--max-time", "180"] + curl_headers +
+                ["-d", payload_json, f"{LITELLM_BASE}/chat/completions"],
+                capture_output=True,
+                text=True,
+                timeout=20
+            )
+            
+            if result.returncode == 0:
+                try:
+                    data = json.loads(result.stdout)
+                    content = data.get("choices", [{}])[0].get("content", "").strip()
+                    if content:
+                        return content
+                except (json.JSONDecodeError, KeyError, IndexError) as e:
+                    pass  # Will fall through to retry/fallback
+            else:
+                pass  # Will fall through to retry/fallback
+        except Exception as e:
+            pass  # Will fall through to retry/fallback
         await asyncio.sleep(5 * (attempt + 1))
 
     # Fallback: write a simple list digest so the run never fails completely

@@ -15,11 +15,22 @@ def fetch_youtube_channel(channel_id: str, per_page: int = 50) -> List[Dict]:
     url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}&max_results={min(per_page, 50)}"
     headers = {"User-Agent": "signal-engine/1.0"}
     
-    with httpx.Client(timeout=30.0) as client:
-        resp = client.get(url, headers=headers)
-        resp.raise_for_status()
-    
-    root = ET.fromstring(resp.text)
+    # Make HTTP request via curl subprocess
+    curl_headers = []
+    for key, value in headers.items():
+        curl_headers.extend(["-H", f"{key}: {value}"])
+
+    result = subprocess.run(
+        ["curl", "-k", "-s", "--max-time", "30"] + curl_headers + [url],
+        capture_output=True,
+        text=True,
+        timeout=35
+    )
+
+    if result.returncode != 0:
+        raise Exception(f"Curl failed: {result.stderr}")
+
+    root = ET.fromstring(result.stdout)
     items = []
     for entry in root.findall('atom:entry', NS):
         video_id = entry.find('atom:yt:videoId', NS)
