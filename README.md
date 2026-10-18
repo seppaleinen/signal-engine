@@ -128,20 +128,23 @@ kubectl create secret generic signal-engine-secret \
 | `persistence.storageClassName` | cluster default | Pin a storage class |
 | `cronJob.schedule` | `30 7 * * *` | Cron expression |
 | `cronJob.timezone` | cluster TZ | e.g. `Europe/Helsinki` |
-| `image.repository` | `seppaleinen/signal-engine` | Override the image |
+| `image.repository` | `ghcr.io/seppaleinen/signal-engine` | Override the image |
 | `image.tag` | `latest` | Override the tag |
 
 ## Releasing (automated)
 
 - **Auto release on main:** Push to `main` triggers a patch bump, builds the Docker image
-  `seppaleinen/signal-engine:<version>` (+ `:latest`), tags the chart, and creates a
+  `ghcr.io/seppaleinen/signal-engine:<version>` (+ `:latest`), tags the chart, and creates a
   GitHub Release `chart/v<version>` with asset `signal-engine-<version>.tgz`.
 
 - **Manual minor/major:** Push a tag `vX.Y.Z` to manually release a specific version.
   The workflow validates the tag, converges the chart files, builds & pushes the image,
   and releases the chart.
 
-- **Secrets required:** `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (Docker Hub).
+- **Secrets required:** None beyond the default `GITHUB_TOKEN` (images are published to
+  [GitHub Container Registry](https://docs.github.com/en/packages/working-with-packages/publishing-packages-with-github-container-registry)
+  `ghcr.io/seppaleinen/signal-engine`). The `GITHUB_TOKEN` secret has `write:packages`
+  permission by default in workflows.
 
 - **Consume:** Replace `<version>` below; chart archives are named
   `signal-engine-<version>.tgz` and released under tag `chart/v<version>`:

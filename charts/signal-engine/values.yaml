@@ -1,10 +1,10 @@
 # Default values for signal-engine Helm chart.
 
 # Image used for both the CronJob (pipeline --run) and the Deployment (viewer --viewer).
-# Reuse the existing signal-engine:latest image. Override image.repository / image.tag
+# Published to GitHub Container Registry. Override image.repository / image.tag
 # to point at a different registry/tag (e.g. your own build).
 image:
-  repository: seppaleinen/signal-engine
+  repository: ghcr.io/seppaleinen/signal-engine
   tag: latest
   pullPolicy: IfNotPresent
 
