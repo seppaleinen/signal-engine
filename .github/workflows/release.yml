@@ -1,0 +1,275 @@
+# Release Workflow
+#
+# Version Decision Tree:
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ Trigger          │ Mode      │ Version Resolution                          │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ Push to main     │ AUTO      │ 1. Resolve base: latest git tag v* → strip v│
+# │                  │           │ 2. If no tags: fall back to pyproject.toml  │
+# │                  │           │ 3. Bump: patch (X.Y.Z+1)                    │
+# │                  │           │ 4. Rewrite: pyproject.toml + Chart.yaml     │
+# │                  │           │ 5. Commit back to main [skip ci]            │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ Push tag v*      │ MANUAL    │ 1. Strip 'v' from tag → version             │
+# │ (e.g., v1.2.3)   │           │ 2. Validate: must match semver ^[0-9]+\\.[0-9]+\\.[0-9]+$
+# │                  │           │ 3. Rewrite files to match tag (convergence) │
+# │                  │           │ 4. No commit back (tag is authoritative)    │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# Release tag format: chart/v<version> (e.g., chart/v0.1.2)
+# Image tags: seppaleinen/signal-engine:<version> + :latest
+# [skip ci] in commit message prevents self-triggering the workflow
+
+name: Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 1: version
+  # - Resolves version (tag-driven or auto-bump)
+  # - Rewrites pyproject.toml + Chart.yaml
+  # - Packages Helm chart
+  # - Outputs: version, is_tag, previous_version
+  # ─────────────────────────────────────────────────────────────────────────────
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      is_tag: ${{ steps.resolve.outputs.is_tag }}
+      previous_version: ${{ steps.resolve.outputs.previous_version }}
+    steps:
+      - name: Checkout (full history for tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v4.3.1
+
+      - name: Determine version
+        id: resolve
+        run: |
+          set -euo pipefail
+
+          TAG_MODE="false"
+          VERSION=""
+          PREVIOUS_VERSION=""
+
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            # TAG run: strip 'v' prefix, validate semver
+            TAG_NAME="${{ github.ref_name }}"
+            if [[ ! "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Error: Tag '$TAG_NAME' does not match ^v[0-9]+\\.[0-9]+\\.[0-9]+$" >&2
+              exit 1
+            fi
+            VERSION="${TAG_NAME#v}"
+            TAG_MODE="true"
+            echo "Tag-driven release: $VERSION"
+
+            # Find previous tag for release notes
+            PREVIOUS_VERSION=$(git tag --list 'v*' --sort=-v:refname | \
+              grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | \
+              awk -v current="v$VERSION" 'found { print; exit } $0 == current { found=1 }' | \
+              sed 's/^v//' || echo "unknown")
+          else
+            # MAIN push: auto-bump patch
+            echo "Auto-bump (patch) from latest tag or pyproject.toml..."
+            VERSION=$(bash scripts/bump-version.sh patch --dry-run)
+            echo "Resolved new version: $VERSION"
+
+            # Find previous version (latest tag or pyproject.toml)
+            PREVIOUS_VERSION=$(git tag --list 'v*' --sort=-v:refname | \
+              grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 | sed 's/^v//' || \
+              grep -E '^version\s*=' pyproject.toml | head -1 | sed 's/^version\s*=\s*"\([^"]*\)".*/\1/' || \
+              echo "unknown")
+          fi
+
+          # Apply rewrites (converge files to resolved version)
+          if [[ "$TAG_MODE" == "true" ]]; then
+            # Tag run: use 'set' to converge files to tag version
+            bash scripts/bump-version.sh set "$VERSION"
+          else
+            # Main run: apply the bump (writes new version)
+            bash scripts/bump-version.sh patch
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "is_tag=$TAG_MODE" >> "$GITHUB_OUTPUT"
+          echo "previous_version=$PREVIOUS_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Package Helm chart
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          helm package charts/signal-engine -d dist/
+          echo "Packaged: dist/signal-engine-${{ steps.resolve.outputs.version }}.tgz"
+
+      - name: Upload chart artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chart-tarball
+          path: dist/signal-engine-${{ steps.resolve.outputs.version }}.tgz
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 2: build-and-push
+  # - Builds Docker image from checked-out source
+  # - Pushes to Docker Hub with version + latest tags
+  # - Note: image is built from source at pushed commit; version rewrites in
+  #   the 'version' job affect that job's workspace only. The image tag is
+  #   authoritative; pyproject.toml version in the image is for dependency
+  #   resolution only.
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: [version]
+    outputs:
+      image_digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            seppaleinen/signal-engine:${{ needs.version.outputs.version }}
+            seppaleinen/signal-engine:latest
+          labels: |
+            org.opencontainers.image.version=${{ needs.version.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 3: commit-bump
+  # - Runs ONLY on MAIN push (skipped on tag runs)
+  # - Commits version rewrites back to main with [skip ci] marker
+  # - Idempotent: skips commit if no changes
+  # ─────────────────────────────────────────────────────────────────────────────
+  commit-bump:
+    runs-on: ubuntu-latest
+    needs: [version]
+    if: needs.version.outputs.is_tag == 'false'
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Apply version bump
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.version.outputs.version }}"
+          echo "Setting version to $VERSION..."
+          # Use 'set' mode to converge files to the computed version
+          bash scripts/bump-version.sh set "$VERSION"
+
+      - name: Commit and push
+        run: |
+          set -euo pipefail
+          git add pyproject.toml charts/signal-engine/Chart.yaml
+          if git diff --cached --quiet; then
+            echo "No changes to commit (already at version ${{ needs.version.outputs.version }})"
+          else
+            git commit -m "chore(release): bump to ${{ needs.version.outputs.version }} [skip ci]"
+            git push origin main
+            echo "Committed and pushed version bump"
+          fi
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 4: github-release
+  # - Creates GitHub Release with chart asset
+  # - Tag: chart/v<version> (matches existing convention)
+  # - Runs after build-and-push + commit-bump (if applicable)
+  # - Handles re-runs: fails fast if release already exists (no overwrite)
+  # ─────────────────────────────────────────────────────────────────────────────
+  github-release:
+    runs-on: ubuntu-latest
+    needs: [version, build-and-push, commit-bump]
+    if: |
+      always() &&
+      !cancelled() &&
+      needs.version.result == 'success' &&
+      needs.build-and-push.result == 'success' &&
+      (needs.commit-bump.result == 'success' || needs.commit-bump.result == 'skipped')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download chart artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: chart-tarball
+          path: dist/
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.version.outputs.version }}"
+          RELEASE_TAG="chart/v${VERSION}"
+          CHART_FILE="dist/signal-engine-${VERSION}.tgz"
+          PREVIOUS="${{ needs.version.outputs.previous_version }}"
+          IMAGE_DIGEST="${{ needs.build-and-push.outputs.image_digest }}"
+
+          echo "Creating release: $RELEASE_TAG"
+          echo "Chart: $CHART_FILE"
+          echo "Previous version: $PREVIOUS"
+
+          # Check if release already exists (re-run guard)
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Error: Release '$RELEASE_TAG' already exists. Delete it first to re-run." >&2
+            exit 1
+          fi
+
+          # Generate release notes
+          NOTES="## Changes
+          - Image: \`seppaleinen/signal-engine:${VERSION}\`
+          - Chart: \`signal-engine-${VERSION}.tgz\`
+          - Previous version: ${PREVIOUS}
+          - Commit: ${GITHUB_SHA}
+          "
+          if [[ -n "$IMAGE_DIGEST" ]]; then
+            NOTES="${NOTES}
+          - Image digest: \`$IMAGE_DIGEST\`
+          "
+          fi
+
+          # Create release
+          gh release create "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "signal-engine chart v${VERSION}" \
+            --notes "$NOTES" \
+            "$CHART_FILE"
+
+          echo "Release created: $RELEASE_TAG"
