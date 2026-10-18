@@ -4,12 +4,10 @@ from typing import Dict, List
 
 import httpx
 
+from signal_engine.config import get_reddit_subreddits
+
 # Free Reddit RSS — no API key, no paid scraper. Reddit rate-limits unauthenticated
 # requests (429), so we retry with backoff and cap posts per run.
-REDDIT_SUBREDDITS = {
-    "reddit-local-llm": ("r/LocalLLM", "LocalLLM"),
-    "reddit-machine-learning": ("r/MachineLearning", "MachineLearning"),
-}
 
 NS = {
     'atom': 'http://www.w3.org/2005/Atom',
@@ -17,7 +15,7 @@ NS = {
 }
 
 def fetch_reddit_subreddit(subreddit: str, per_page: int = 30, max_retries: int = 4) -> List[Dict]:
-    url = f"https://www.reddit.com/{subreddit}/.rss"
+    url = f"https://www.reddit.com/r/{subreddit}/.rss"
     headers = {"User-Agent": "signal-engine/1.0 (by seppa; contact: seppa@example.com)"}
     
     last_err = None
@@ -80,7 +78,9 @@ def fetch_reddit_subreddit(subreddit: str, per_page: int = 30, max_retries: int 
 
 def fetch_all_reddit(per_page: int = 30) -> Dict[str, List[Dict]]:
     results = {}
-    for source_name, (subreddit, display_name) in REDDIT_SUBREDDITS.items():
+    for source_name, cfg in get_reddit_subreddits().items():
+        subreddit = cfg["subreddit"]
+        display_name = cfg["display_name"]
         try:
             items = fetch_reddit_subreddit(subreddit, per_page=per_page)
             results[source_name] = items

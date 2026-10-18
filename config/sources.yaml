@@ -1,0 +1,55 @@
+youtube:
+  betterstack:
+    channel_id: "UCkVfrGwV-iG9bSsgCbrNPxQ"
+    display_name: "Better Stack"
+    enabled: true
+  aiDotEngineer:
+    channel_id: "UCLKPca3kwwd-B59HNr-_lvA"
+    display_name: "AI Engineer"
+    enabled: true
+  fireship:
+    channel_id: "UCsBjURrPoezykLs9EqgamOA"
+    display_name: "Fireship"
+    enabled: true
+reddit:
+  reddit-local-llm:
+    subreddit: "LocalLLM"
+    display_name: "LocalLLM"
+    enabled: true
+  reddit-machine-learning:
+    subreddit: "MachineLearning"
+    display_name: "MachineLearning"
+    enabled: true
+github:
+  opencode-releases:
+    owner: "anomalyco"
+    repo: "opencode"
+    enabled: true
+  llama-swap-releases:
+    owner: "mostlygeek"
+    repo: "llama-swap"
+    enabled: true
+  hindsight-releases:
+    owner: "vectorize-io"
+    repo: "hindsight"
+    enabled: true
+  litellm-releases:
+    owner: "BerriAI"
+    repo: "litellm"
+    enabled: true
+  lmstudio-releases:
+    owner: "lmstudio-ai"
+    repo: "lms"
+    enabled: true
+  lmstudio-js-releases:
+    owner: "lmstudio-ai"
+    repo: "lmstudio-js"
+    enabled: true
+  lmstudio-python-releases:
+    owner: "lmstudio-ai"
+    repo: "lmstudio-python"
+    enabled: true
+  git-releases:
+    owner: "git"
+    repo: "git"
+    enabled: true

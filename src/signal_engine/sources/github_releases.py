@@ -2,18 +2,8 @@ from typing import Dict, List
 
 import httpx
 
-# Source registry: source_name -> (owner, repo)
-# Populated from PROFILE.md + GitHub API verification (all return 200).
-GITHUB_SOURCES = {
-    "opencode-releases": ("anomalyco", "opencode"),
-    "llama-swap-releases": ("mostlygeek", "llama-swap"),
-    "hindsight-releases": ("vectorize-io", "hindsight"),
-    "litellm-releases": ("BerriAI", "litellm"),
-    "lmstudio-releases": ("lmstudio-ai", "lms"),
-    "lmstudio-js-releases": ("lmstudio-ai", "lmstudio-js"),
-    "lmstudio-python-releases": ("lmstudio-ai", "lmstudio-python"),
-    "git-releases": ("git", "git"),
-}
+from signal_engine.config import get_github_sources
+
 
 def fetch_github_releases(owner: str, repo: str, per_page: int = 50) -> List[Dict]:
     url = f"https://api.github.com/repos/{owner}/{repo}/releases"
@@ -49,13 +39,16 @@ def fetch_github_releases(owner: str, repo: str, per_page: int = 50) -> List[Dic
 def fetch_all_sources(per_page: int = 50, skip_drafts: bool = True) -> Dict[str, List[Dict]]:
     """Fetch every registered GitHub source. Returns {source_name: [items]}."""
     results = {}
-    for source_name, (owner, repo) in GITHUB_SOURCES.items():
+    for source_name, cfg in get_github_sources().items():
+        owner = cfg["owner"]
+        repo = cfg["repo"]
+        display_name = cfg.get("display_name", source_name)
         try:
             items = fetch_github_releases(owner, repo, per_page=per_page)
             if skip_drafts:
                 items = [i for i in items if not i['metadata'].get('draft')]
             results[source_name] = items
-            print(f"  {source_name}: {len(items)} items")
+            print(f"  {source_name} ({display_name}): {len(items)} items")
         except Exception as e:
             print(f"  {source_name}: FAILED - {e}")
             results[source_name] = []

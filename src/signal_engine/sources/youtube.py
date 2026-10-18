@@ -3,12 +3,7 @@ from typing import Dict, List
 
 import httpx
 
-# Verified channel IDs (R2.2). RSS is free — no API key needed.
-YOUTUBE_CHANNELS = {
-    "betterstack": ("UCkVfrGwV-iG9bSsgCbrNPxQ", "Better Stack"),
-    "aiDotEngineer": ("UCLKPca3kwwd-B59HNr-_lvA", "AI Engineer"),
-    "fireship": ("UCsBjURrPoezykLs9EqgamOA", "Fireship"),
-}
+from signal_engine.config import get_youtube_channels
 
 NS = {
     'atom': 'http://www.w3.org/2005/Atom',
@@ -58,7 +53,9 @@ def fetch_youtube_channel(channel_id: str, per_page: int = 50) -> List[Dict]:
 
 def fetch_all_youtube(per_page: int = 50) -> Dict[str, List[Dict]]:
     results = {}
-    for source_name, (channel_id, display_name) in YOUTUBE_CHANNELS.items():
+    for source_name, cfg in get_youtube_channels().items():
+        channel_id = cfg["channel_id"]
+        display_name = cfg["display_name"]
         try:
             items = fetch_youtube_channel(channel_id, per_page=per_page)
             results[source_name] = items
