@@ -51,11 +51,13 @@ spec:
                     name: {{ $cmName | quote }}
                 - secretRef:
                     name: {{ $secretName | quote }}
+              {{- if .Values.cronJob.extraEnv }}
               env:
                 {{- range .Values.cronJob.extraEnv }}
                 - name: {{ .name | quote }}
                   value: {{ .value | quote }}
                 {{- end }}
+              {{- end }}
               volumeMounts:
                 {{- if .Values.persistence.enabled }}
                 - name: data

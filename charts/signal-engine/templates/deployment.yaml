@@ -50,11 +50,13 @@ spec:
                 name: {{ $cmName | quote }}
             - secretRef:
                 name: {{ $secretName | quote }}
+          {{- if .Values.viewer.extraEnv }}
           env:
             {{- range .Values.viewer.extraEnv }}
             - name: {{ .name | quote }}
               value: {{ .value | quote }}
             {{- end }}
+          {{- end }}
           volumeMounts:
             {{- if .Values.persistence.enabled }}
             - name: data
