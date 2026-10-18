@@ -142,10 +142,10 @@ kubectl create secret generic signal-engine-secret \
   and releases the chart.
 
 - **Secrets required:** `GHCR_TOKEN` — a classic personal access token with
-  `write:packages` and `read:packages` scopes (images are published to
-  [GitHub Container Registry](https://docs.github.com/en/packages/working-with-packages/publishing-packages-with-github-container-registry)
-  `ghcr.io/seppaleinen/signal-engine`). The default `GITHUB_TOKEN` cannot push to
-  GHCR for a personal user account — a dedicated PAT is required.
+  `write:packages`, `read:packages`, and `contents:write` scopes. The token is used
+  for both GHCR image push and committing version bumps back to `main`.
+  The default `GITHUB_TOKEN` cannot push to GHCR for a personal user account —
+  a dedicated PAT is required.
 
 - **Consume:** Replace `<version>` below; chart archives are named
   `signal-engine-<version>.tgz` and released under tag `chart/v<version>`:
