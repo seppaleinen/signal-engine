@@ -4,6 +4,7 @@ from pathlib import Path
 from signal_engine.filters import apply_filters
 from signal_engine.sources.github_releases import fetch_all_sources as fetch_github
 from signal_engine.sources.reddit import fetch_all_reddit
+from signal_engine.sources.rss import fetch_all_rss
 from signal_engine.sources.youtube import fetch_all_youtube
 from signal_engine.store import Store
 
@@ -19,6 +20,9 @@ def fetch_all():
         all_items[src] = items
     print("Fetching Reddit subreddits...")
     for src, items in fetch_all_reddit(per_page=15).items():
+        all_items[src] = items
+    print("Fetching RSS feeds...")
+    for src, items in fetch_all_rss(per_page=15).items():
         all_items[src] = items
     return all_items
 
@@ -61,6 +65,11 @@ def run_stage3(db_path: Path):
     print("Fetching Reddit (max 10 per subreddit)...")
     red_items = fetch_all_reddit(per_page=10)
     for src, items in red_items.items():
+        all_items.setdefault(src, []).extend(items)
+
+    print("Fetching RSS feeds (max 10 per feed)...")
+    rss_items = fetch_all_rss(per_page=10)
+    for src, items in rss_items.items():
         all_items.setdefault(src, []).extend(items)
     
     # Apply filters per source

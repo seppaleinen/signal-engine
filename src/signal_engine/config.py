@@ -112,7 +112,7 @@ def _dump_sources_yaml(cfg: Dict[str, Any]) -> str:
 
 
 def _validate_config(config: Dict[str, Any]) -> None:
-    allowed_sections = {"youtube", "reddit", "github"}
+    allowed_sections = {"youtube", "reddit", "github", "rss"}
     if not isinstance(config, dict):
         raise ConfigError("Config root must be a mapping")
 
@@ -153,6 +153,11 @@ def _validate_config(config: Dict[str, Any]) -> None:
                 # display_name optional
                 if "display_name" in entry and not isinstance(entry["display_name"], str):
                     raise ConfigError(f"{sec}/{name} display_name must be string")
+            elif sec == "rss":
+                for field in ("feed_url", "display_name"):
+                    v = entry.get(field)
+                    if not isinstance(v, str) or not v.strip():
+                        raise ConfigError(f"{sec}/{name} missing non-empty {field}")
 
 
 def _load_and_validate(path: Path) -> Dict[str, Any]:
@@ -222,6 +227,19 @@ def get_github_sources() -> Dict[str, Dict[str, str]]:
             "owner": entry["owner"],
             "repo": entry["repo"],
             "display_name": entry.get("display_name", name),
+        }
+    return out
+
+
+def get_rss_sources() -> Dict[str, Dict[str, str]]:
+    cfg = load_config()
+    out: Dict[str, Dict[str, str]] = {}
+    for name, entry in cfg.get("rss", {}).items():
+        if not _is_enabled(entry):
+            continue
+        out[name] = {
+            "feed_url": entry["feed_url"],
+            "display_name": entry["display_name"],
         }
     return out
 

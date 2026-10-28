@@ -53,3 +53,8 @@ github:
     owner: "git"
     repo: "git"
     enabled: true
+rss:
+  tldr:
+    feed_url: "https://kill-the-newsletter.com/feeds/seppa-tldr.xml"
+    display_name: "TLDR Newsletter"
+    enabled: true

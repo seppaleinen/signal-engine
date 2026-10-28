@@ -98,7 +98,7 @@ label { display: block; margin-bottom: 0.2rem; font-weight: 500; }
 </head>
 <body>
 <h1>Source Admin</h1>
-<p class="muted">Manage YouTube channels, Reddit subreddits, and GitHub repos. Changes persist to <code>config/sources.yaml</code>.</p>
+<p class="muted">Manage YouTube channels, Reddit subreddits, GitHub repos, and RSS feeds. Changes persist to <code>config/sources.yaml</code>.</p>
 
 <div id="toast" class="toast hidden"></div>
 
@@ -126,6 +126,14 @@ label { display: block; margin-bottom: 0.2rem; font-weight: 500; }
   <ul id="github-list"></ul>
 </section>
 
+<section id="rss">
+  <div class="section-header">
+    <h2>RSS Feeds</h2>
+    <button onclick="openModal('rss')">Add Feed</button>
+  </div>
+  <ul id="rss-list"></ul>
+</section>
+
 <div id="modal" class="modal hidden" role="dialog">
   <div class="modal-content">
     <h2 id="modal-title">Add Source</h2>
@@ -149,6 +157,10 @@ label { display: block; margin-bottom: 0.2rem; font-weight: 500; }
         <input type="text" name="owner" id="modal-owner" required>
         <label>Repo</label>
         <input type="text" name="repo" id="modal-repo" required>
+      </div>
+      <div class="form-group" id="modal-rss-fields" style="display:none;">
+        <label>Feed URL (e.g. https://kill-the-newsletter.com/feeds/xxx.xml)</label>
+        <input type="url" name="feed_url" id="modal-feed-url" required>
       </div>
       <div class="form-group">
         <label><input type="checkbox" name="enabled" id="modal-enabled" checked> Enabled</label>
@@ -186,6 +198,7 @@ function renderSources() {
     renderSection('youtube', cfg.youtube || {}, 'channel_id');
     renderSection('reddit', cfg.reddit || {}, 'subreddit');
     renderSection('github', cfg.github || {}, 'owner');
+    renderSection('rss', cfg.rss || {}, 'feed_url');
   }).catch(e => showToast('Failed to load sources: '+e, 'error'));
 }
 
@@ -195,7 +208,7 @@ function renderSection(type, sources, keyField) {
   for (const [name, entry] of Object.entries(sources)) {
     const li = document.createElement('li');
     li.className = 'source-item';
-    const meta = entry[keyField] || (entry.owner ? entry.owner+'/'+entry.repo : '');
+    const meta = entry[keyField] || (entry.feed_url ? entry.feed_url : entry.owner ? entry.owner+'/'+entry.repo : '');
     const display = entry.display_name || name;
     li.innerHTML = `
       <div class="source-info">
@@ -225,6 +238,7 @@ function openModal(type, name=null) {
   document.getElementById('modal-subreddit').value = '';
   document.getElementById('modal-owner').value = '';
   document.getElementById('modal-repo').value = '';
+  document.getElementById('modal-feed-url').value = '';
   document.querySelectorAll('[id^="modal-"][id$="-fields"]').forEach(el => el.style.display='none');
   document.getElementById('modal-'+type+'-fields').style.display='block';
   if (name) {
@@ -239,6 +253,7 @@ function openModal(type, name=null) {
         if (type==='youtube') document.getElementById('modal-channel-id').value = e.channel_id;
         if (type==='reddit') document.getElementById('modal-subreddit').value = e.subreddit;
         if (type==='github') { document.getElementById('modal-owner').value = e.owner; document.getElementById('modal-repo').value = e.repo; }
+        if (type==='rss') document.getElementById('modal-feed-url').value = e.feed_url;
       }
     });
   } else {
@@ -251,7 +266,7 @@ function closeModal() {
   document.getElementById('modal').classList.add('hidden');
 }
 
-document.getElementById('modal-form').addEventListener('submit', async e => {
+function submitHandler(e) {
   e.preventDefault();
   const form = e.target;
   const type = form.source_type.value;
@@ -263,6 +278,7 @@ document.getElementById('modal-form').addEventListener('submit', async e => {
   if (type==='youtube') data.channel_id = form.channel_id.value;
   if (type==='reddit') data.subreddit = form.subreddit.value;
   if (type==='github') { data.owner = form.owner.value; data.repo = form.repo.value; }
+  if (type==='rss') data.feed_url = form.feed_url.value;
   try {
     if (name) {
       await fetchAPI(API + '/' + type + '/' + name, {method:'PATCH', body:JSON.stringify(data)});
@@ -276,7 +292,8 @@ document.getElementById('modal-form').addEventListener('submit', async e => {
   } catch (err) {
     showToast(err.message, 'error');
   }
-});
+}
+document.getElementById('modal-form').addEventListener('submit', submitHandler);
 
 async function toggleSource(type, name, enabled) {
   try {
@@ -451,7 +468,7 @@ class _DigestHandler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         type_ = parts[3]
-        if type_ not in {"youtube", "reddit", "github"}:
+        if type_ not in {"youtube", "reddit", "github", "rss"}:
             self._json_send(400, {"error": "unknown source type"})
             return
         data = self._read_json_body()
@@ -501,7 +518,7 @@ class _DigestHandler(BaseHTTPRequestHandler):
                 self._json_send(400, {"error": "display_name required"})
                 return
             entry = {"subreddit": subreddit.strip(), "display_name": display_name.strip(), "enabled": enabled}
-        else:  # github
+        elif type_ == "github":
             owner = data.get("owner")
             repo = data.get("repo")
             if not isinstance(owner, str) or not owner.strip():
@@ -514,6 +531,19 @@ class _DigestHandler(BaseHTTPRequestHandler):
             if not isinstance(display_name, str) or not display_name.strip():
                 display_name = source_name
             entry = {"owner": owner.strip(), "repo": repo.strip(), "display_name": display_name.strip(), "enabled": enabled}
+        elif type_ == "rss":
+            feed_url = data.get("feed_url")
+            display_name = data.get("display_name")
+            if not isinstance(feed_url, str) or not feed_url.strip():
+                self._json_send(400, {"error": "feed_url required"})
+                return
+            if not isinstance(display_name, str) or not display_name.strip():
+                self._json_send(400, {"error": "display_name required"})
+                return
+            entry = {"feed_url": feed_url.strip(), "display_name": display_name.strip(), "enabled": enabled}
+        else:
+            self._json_send(400, {"error": "unknown source type"})
+            return
         cfg.setdefault(type_, {})[source_name] = entry
         try:
             _validate_config(cfg)
@@ -535,7 +565,7 @@ class _DigestHandler(BaseHTTPRequestHandler):
             return
         type_ = parts[3]
         source_name = parts[4]
-        if type_ not in {"youtube", "reddit", "github"}:
+        if type_ not in {"youtube", "reddit", "github", "rss"}:
             self._json_send(400, {"error": "unknown source type"})
             return
         if not re.match(r"^[a-zA-Z0-9_-]+$", source_name):
@@ -588,7 +618,20 @@ class _DigestHandler(BaseHTTPRequestHandler):
                     self._json_send(400, {"error": "display_name must be non-empty string"})
                     return
                 entry["display_name"] = v.strip()
-        else:
+        elif type_ == "rss":
+            if "feed_url" in data:
+                v = data["feed_url"]
+                if not isinstance(v, str) or not v.strip():
+                    self._json_send(400, {"error": "feed_url must be non-empty string"})
+                    return
+                entry["feed_url"] = v.strip()
+            if "display_name" in data:
+                v = data["display_name"]
+                if not isinstance(v, str) or not v.strip():
+                    self._json_send(400, {"error": "display_name must be non-empty string"})
+                    return
+                entry["display_name"] = v.strip()
+        else:  # github
             if "owner" in data:
                 v = data["owner"]
                 if not isinstance(v, str) or not v.strip():
@@ -628,7 +671,7 @@ class _DigestHandler(BaseHTTPRequestHandler):
             return
         type_ = parts[3]
         source_name = parts[4]
-        if type_ not in {"youtube", "reddit", "github"}:
+        if type_ not in {"youtube", "reddit", "github", "rss"}:
             self._json_send(400, {"error": "unknown source type"})
             return
         if not re.match(r"^[a-zA-Z0-9_-]+$", source_name):
