@@ -163,6 +163,13 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Set Docker Hub tags
+        if: ${{ vars.DOCKERHUB_USERNAME != '' }}
+        id: dh-tags
+        run: |
+          echo "tag_version=${{ vars.DOCKERHUB_USERNAME }}/signal-engine:${{ needs.version.outputs.version }}" >> "$GITHUB_OUTPUT"
+          echo "tag_latest=${{ vars.DOCKERHUB_USERNAME }}/signal-engine:latest" >> "$GITHUB_OUTPUT"
+
       - name: Build and push (multi-platform)
         id: build
         uses: docker/build-push-action@v6
@@ -174,8 +181,8 @@ jobs:
           tags: |
             ghcr.io/seppaleinen/signal-engine:${{ needs.version.outputs.version }}
             ghcr.io/seppaleinen/signal-engine:latest
-            ${{ vars.DOCKERHUB_USERNAME != '' && format('${{ vars.DOCKERHUB_USERNAME }}/signal-engine:{0}', needs.version.outputs.version) || '' }}
-            ${{ vars.DOCKERHUB_USERNAME != '' && format('${{ vars.DOCKERHUB_USERNAME }}/signal-engine:latest') || '' }}
+            ${{ steps.dh-tags.outputs.tag_version || '' }}
+            ${{ steps.dh-tags.outputs.tag_latest || '' }}
           labels: |
             org.opencontainers.image.version=${{ needs.version.outputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
