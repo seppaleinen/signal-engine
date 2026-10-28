@@ -26,7 +26,7 @@ FOCUS = "practical AI-for-coding — building systems with AI, optimizing AI wor
 DIGEST_CAP = 10
 DIGEST_FORMAT = """# {date} - {headline}
 
-## Releases & Updates
+## Updates
 {items}
 
 ## Also worth a look
@@ -45,17 +45,19 @@ Rules:
 - Say plainly when something is a rumor, a minor update or a deprecation.
 - A changelog entry is a launch only if it says something launched.
 - No hype words, no exclamation marks.
+- If an item has a thumbnail URL, include it as markdown: ![thumbnail](url) at the start of the entry.
+- Use a single "## Updates" section (not tool-specific sections). Group by theme.
 
 Format:
 # {date} - <one line on what mattered today>
 
-## <Group>
-- **<Item in plain words>** - one or two sentences on what changed and why it matters. [source](url)
+## Updates
+- ![thumbnail](url) **<Item in plain words>** - one or two sentences on what changed and why it matters. [source](url)
 
 ## Also worth a look
 - one-liners with links
 
-Items (JSON array with title, source, url, body, relevance, new, route):
+Items (JSON array with title, source, url, body, thumbnail, relevance, new, route):
 {items_json}
 
 Respond with markdown only. No extra text before or after.
@@ -77,6 +79,7 @@ async def generate_digest(items: List[Dict], date_str: str | None = None) -> str
             "source": item.get("source", ""),
             "url": item.get("url", ""),
             "body": item.get("body", "")[:300],
+            "thumbnail": item.get("metadata", {}).get("thumbnail"),
             "relevance": item.get("decision", {}).get("relevance", 0),
             "new": item.get("decision", {}).get("new", 0),
             "route": item.get("decision", {}).get("route", "unsure")
@@ -93,10 +96,11 @@ async def generate_digest(items: List[Dict], date_str: str | None = None) -> str
         # Mock digest for testing
         headline = f"{len(items)} items passed filters"
         items_md = "\n".join([
-            f"- **{item.get('title', 'Untitled')}** - {item.get('source', 'unknown')} [{item.get('route', 'unknown')}]. [link]({item.get('url', '#')})"
+            (f"- ![thumbnail]({item.get('metadata', {}).get('thumbnail')}) " if item.get('metadata', {}).get('thumbnail') else "")
+            + f"**{item.get('title', 'Untitled')}** - {item.get('source', 'unknown')} [{item.get('route', 'unknown')}]. [link]({item.get('url', '#')})"
             for item in items[:DIGEST_CAP]
         ])
-        return f"# {date_str or datetime.now().strftime('%Y-%m-%d')} - {headline}\n\n## Releases & Updates\n{items_md}\n"
+        return f"# {date_str or datetime.now().strftime('%Y-%m-%d')} - {headline}\n\n## Updates\n{items_md}\n"
     
     # Real LLM call
     payload = {
@@ -154,10 +158,11 @@ async def generate_digest(items: List[Dict], date_str: str | None = None) -> str
 
     # Fallback: write a simple list digest so the run never fails completely
     items_md = "\n".join([
-        f"- **{item.get('title', 'Untitled')}** - Source: {item.get('source', 'unknown')}. [link]({item.get('url', '#')})"
+        (f"- ![thumbnail]({item.get('metadata', {}).get('thumbnail')}) " if item.get('metadata', {}).get('thumbnail') else "")
+        + f"**{item.get('title', 'Untitled')}** - Source: {item.get('source', 'unknown')}. [link]({item.get('url', '#')})"
         for item in items[:DIGEST_CAP]
     ])
-    return f"# {date_str} - Digest (fallback)\n\n## Items\n{items_md}"
+    return f"# {date_str} - Digest (fallback)\n\n## Updates\n{items_md}"
 
 def write_digest(digest: str, date_str: str | None = None, digest_dir: str = "digests") -> Path:
     """Write digest markdown to file, plus an HTML rendering alongside.

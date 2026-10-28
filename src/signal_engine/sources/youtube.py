@@ -46,6 +46,14 @@ def fetch_youtube_channel(channel_id: str, per_page: int = 50) -> List[Dict]:
                 views = int(v.attrib['views'])
         
         vid = video_id.text if video_id is not None else ''
+
+        # Extract thumbnail from media:group/media:thumbnail
+        thumbnail_url = None
+        if media_group is not None:
+            thumb = media_group.find('media:thumbnail', NS)
+            if thumb is not None and 'url' in thumb.attrib:
+                thumbnail_url = thumb.attrib['url']
+
         items.append({
             'id': f"youtube:{vid}",
             'title': title.text if title is not None else '',
@@ -56,6 +64,7 @@ def fetch_youtube_channel(channel_id: str, per_page: int = 50) -> List[Dict]:
             'metadata': {
                 'author': author.find('atom:name', NS).text if author is not None and author.find('atom:name', NS) is not None else '',
                 'channel_id': channel_id,
+                'thumbnail': thumbnail_url,
             }
         })
     

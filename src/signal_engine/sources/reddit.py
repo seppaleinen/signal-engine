@@ -13,10 +13,11 @@ NS = {
     'media': 'http://search.yahoo.com/mrss/',
 }
 
+
 def fetch_reddit_subreddit(subreddit: str, per_page: int = 30, max_retries: int = 4) -> List[Dict]:
     url = f"https://www.reddit.com/r/{subreddit}/.rss"
     headers = {"User-Agent": "signal-engine/1.0 (by seppa; contact: seppa@example.com)"}
-    
+
     last_err = None
     for attempt in range(max_retries):
         try:
@@ -54,7 +55,7 @@ def fetch_reddit_subreddit(subreddit: str, per_page: int = 30, max_retries: int 
                 time.sleep(5 * (attempt + 1))
     else:
         raise RuntimeError(f"Reddit {subreddit} failed after {max_retries} attempts: {last_err}")
-    
+
     root = ET.fromstring(text)
     items = []
     for entry in root.findall('atom:entry', NS):
@@ -63,7 +64,7 @@ def fetch_reddit_subreddit(subreddit: str, per_page: int = 30, max_retries: int 
         published = entry.find('atom:published', NS)
         author = entry.find('atom:author', NS)
         summary = entry.find('atom:summary', NS)
-        
+
         # Reddit RSS links are /r/.../comments/<id>/<slug> — extract the post id
         post_id = ''
         if link is not None and link.attrib.get('href'):
@@ -72,10 +73,18 @@ def fetch_reddit_subreddit(subreddit: str, per_page: int = 30, max_retries: int 
             m = re.search(r'/comments/([a-z0-9]{6,})/', href)
             if m:
                 post_id = m.group(1)
-        
+
         # Engagement: Reddit RSS doesn't expose score reliably; use comment count if present
         engagement = None
-        
+
+        # Extract thumbnail from media:group/media:thumbnail
+        thumbnail_url = None
+        media_group = entry.find('media:group', NS)
+        if media_group is not None:
+            thumb = media_group.find('media:thumbnail', NS)
+            if thumb is not None and 'url' in thumb.attrib:
+                thumbnail_url = thumb.attrib['url']
+
         items.append({
             'id': f"reddit:{subreddit}:{post_id}" if post_id else f"reddit:{subreddit}:{href}",
             'title': title.text if title is not None else '',
@@ -86,10 +95,12 @@ def fetch_reddit_subreddit(subreddit: str, per_page: int = 30, max_retries: int 
             'metadata': {
                 'author': author.find('atom:name', NS).text if author is not None and author.find('atom:name', NS) is not None else '',
                 'subreddit': subreddit,
+                'thumbnail': thumbnail_url,
             }
         })
-    
+
     return items
+
 
 def fetch_all_reddit(per_page: int = 30) -> Dict[str, List[Dict]]:
     results = {}

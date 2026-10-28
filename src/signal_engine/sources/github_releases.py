@@ -33,6 +33,8 @@ def fetch_github_releases(owner: str, repo: str, per_page: int = 50) -> List[Dic
     for rel in releases:
         item_id = f"github:{owner}/{repo}:{rel['tag_name']}"
         body = rel.get('body') or ''
+        # GitHub repo avatar (owner avatar) — consistent, always available
+        thumbnail_url = f"https://github.com/{owner}.png"
         items.append({
             'id': item_id,
             'title': rel['name'] or rel['tag_name'],
@@ -46,6 +48,7 @@ def fetch_github_releases(owner: str, repo: str, per_page: int = 50) -> List[Dic
                 'tag_name': rel['tag_name'],
                 'owner': owner,
                 'repo': repo,
+                'thumbnail': thumbnail_url,
             }
         })
     
