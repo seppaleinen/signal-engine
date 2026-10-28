@@ -157,6 +157,7 @@ jobs:
           password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Login to Docker Hub
+        if: env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != ''
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -173,8 +174,8 @@ jobs:
           tags: |
             ghcr.io/seppaleinen/signal-engine:${{ needs.version.outputs.version }}
             ghcr.io/seppaleinen/signal-engine:latest
-            seppaleinen/signal-engine:${{ needs.version.outputs.version }}
-            seppaleinen/signal-engine:latest
+            ${{ env.DOCKERHUB_USERNAME != '' && format('seppaleinen/signal-engine:{0}', needs.version.outputs.version) || '' }}
+            ${{ env.DOCKERHUB_USERNAME != '' && 'seppaleinen/signal-engine:latest' || '' }}
           labels: |
             org.opencontainers.image.version=${{ needs.version.outputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
