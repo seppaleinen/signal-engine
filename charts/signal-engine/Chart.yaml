@@ -2,8 +2,8 @@ apiVersion: v2
 name: signal-engine
 description: A Helm chart for the signal-engine pipeline (daily digest CronJob + web viewer sidecar).
 type: application
-version: 0.1.4
-appVersion: "0.1.4"
+version: 0.1.5
+appVersion: "0.1.5"
 home: https://github.com/seppaleinen/signal-engine
 sources:
   - https://github.com/seppaleinen/signal-engine
