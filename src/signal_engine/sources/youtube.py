@@ -32,7 +32,7 @@ def fetch_youtube_channel(channel_id: str, per_page: int = 50) -> List[Dict]:
     root = ET.fromstring(result.stdout)
     items = []
     for entry in root.findall('atom:entry', NS):
-        video_id = entry.find('atom:yt:videoId', NS)
+        video_id = entry.find('yt:videoId', NS)
         title = entry.find('atom:title', NS)
         entry.find('atom:link', NS)
         published = entry.find('atom:published', NS)

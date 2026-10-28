@@ -123,8 +123,9 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Job 2: build-and-push
-  # - Builds Docker image from checked-out source
-  # - Pushes to GHCR (ghcr.io/seppaleinen/signal-engine) with version + latest tags
+  # - Builds Docker image (multi-platform) from checked-out source
+  # - Pushes to GHCR (ghcr.io/seppaleinen/signal-engine) and Docker Hub
+  #   (seppaleinen/signal-engine) with version + latest tags
   # - Note: image is built from source at pushed commit; version rewrites in
   #   the 'version' job affect that job's workspace only. The image tag is
   #   authoritative; pyproject.toml version in the image is for dependency
@@ -139,6 +140,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -146,17 +156,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_TOKEN }}
 
-      - name: Build and push
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push (multi-platform)
         id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             ghcr.io/seppaleinen/signal-engine:${{ needs.version.outputs.version }}
             ghcr.io/seppaleinen/signal-engine:latest
+            seppaleinen/signal-engine:${{ needs.version.outputs.version }}
+            seppaleinen/signal-engine:latest
           labels: |
             org.opencontainers.image.version=${{ needs.version.outputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
