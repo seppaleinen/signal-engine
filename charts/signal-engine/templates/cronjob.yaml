@@ -34,6 +34,9 @@ spec:
             - name: digests
               persistentVolumeClaim:
                 claimName: {{ include "signal-engine.fullname" . | printf "%s-digests" | quote }}
+            - name: config
+              configMap:
+                name: {{ $cmName | quote }}
           {{- end }}
           containers:
             - name: run
@@ -65,6 +68,9 @@ spec:
                 - name: digests
                   mountPath: /app/digests
                 {{- end }}
+                - name: config
+                  mountPath: /app/config
+                  readOnly: true
               resources:
                 {{- toYaml .Values.cronJob.resources | nindent 16 }}
 {{- end -}}

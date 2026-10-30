@@ -21,15 +21,18 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name | quote }}
         app.kubernetes.io/component: viewer
     spec:
-      {{- if .Values.persistence.enabled }}
       volumes:
+        {{- if .Values.persistence.enabled }}
         - name: data
           persistentVolumeClaim:
             claimName: {{ include "signal-engine.fullname" . | printf "%s-data" | quote }}
         - name: digests
           persistentVolumeClaim:
             claimName: {{ include "signal-engine.fullname" . | printf "%s-digests" | quote }}
-      {{- end }}
+        {{- end }}
+        - name: config
+          configMap:
+            name: {{ $cmName | quote }}
       containers:
         - name: viewer
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -65,6 +68,9 @@ spec:
               mountPath: /app/digests
               readOnly: false
             {{- end }}
+            - name: config
+              mountPath: /app/config
+              readOnly: true
           resources:
             {{- toYaml .Values.viewer.resources | nindent 12 }}
 {{- end -}}

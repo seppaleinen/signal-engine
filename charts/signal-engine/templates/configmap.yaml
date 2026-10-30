@@ -10,3 +10,12 @@ data:
   DATA_DIR: "/app/data"
   VIEWER_PORT: {{ .Values.viewer.port | quote }}
   CRON_SCHEDULE: {{ .Values.cronJob.schedule | quote }}
+  # sources.yaml is the source configuration file.
+  # Use .Values.configMap.sourcesYaml for override.
+  {{- if .Values.configMap.sourcesYaml }}
+  sources.yaml: |-
+{{ .Values.configMap.sourcesYaml | indent 4 }}
+  {{- else if .Files.Get "config/sources.yaml" }}
+  sources.yaml: |-
+{{ .Files.Get "config/sources.yaml" | indent 4 }}
+  {{- end }}

@@ -83,3 +83,7 @@ ingress:
 # --- ConfigMap ---
 configMap:
   name: signal-engine-config
+  # sourcesYaml allows overriding the entire sources.yaml content.
+  # If not set, the chart will try to include the default config/sources.yaml from the chart.
+  # Set this via --set-file configMap.sourcesYaml=path/to/sources.yaml
+  sourcesYaml: ""
